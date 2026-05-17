@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APAC CAN Trivia Slideshow</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Space+Grotesk:wght@300;400;600;700&family=Bebas+Neue&family=Crimson+Pro:ital,wght@0,400;1,600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    font-family: 'Space Grotesk', sans-serif;
+    background: #000;
+    cursor: none;
+  }
+
+  /* Custom cursor */
+  .cursor {
+    position: fixed; width: 20px; height: 20px;
+    border: 2px solid rgba(255,255,255,0.8);
+    border-radius: 50%; pointer-events: none;
+    z-index: 9999; transform: translate(-50%,-50%);
+    transition: transform 0.1s, border-color 0.2s;
+  }
+
+  /* ── Slide container ── */
+  .slides-wrap {
+    width: 100%; height: 100%;
+    position: relative;
+  }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.7s ease;
+    overflow: hidden;
+    padding: 60px;
+  }
+  .slide.active {
+    opacity: 1; pointer-events: all;
+  }
+
+  /* ── Shared type ── */
+  .slide-number {
+    position: absolute; top: 32px; right: 44px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px; letter-spacing: 3px;
+    opacity: 0.5;
+  }
+  .slide-tag {
+    position: absolute; top: 32px; left: 44px;
+    font-size: 11px; letter-spacing: 4px; text-transform: uppercase;
+    opacity: 0.6; font-weight: 600;
+  }
+  .can-tag {
+    position: absolute; bottom: 32px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    opacity: 0.55; font-weight: 600;
+    border: 1px solid currentColor; padding: 5px 16px; border-radius: 20px;
+  }
+  .emoji-big {
+    font-size: clamp(60px, 10vw, 120px);
+    line-height: 1; margin-bottom: 28px;
+    filter: drop-shadow(0 0 30px rgba(255,255,255,0.3));
+    animation: floatEmoji 4s ease-in-out infinite;
+  }
+  @keyframes floatEmoji {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+  .fact-text {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(24px, 3.2vw, 44px);
+    font-weight: 900; line-height: 1.2;
+    text-align: center; max-width: 920px;
+    position: relative; z-index: 2;
+  }
+  .fact-text em { font-style: italic; }
+  .fact-text mark {
+    background: none;
+    -webkit-text-stroke: 1px currentColor;
+    color: transparent;
+    font-style: italic;
+  }
+  .sub-text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(14px, 1.5vw, 19px);
+    font-weight: 300; letter-spacing: 1px;
+    text-align: center; max-width: 750px;
+    margin-top: 20px; opacity: 0.75;
+    line-height: 1.6;
+    position: relative; z-index: 2;
+  }
+
+  /* ── Decorative shapes ── */
+  .deco {
+    position: absolute; border-radius: 50%;
+    filter: blur(80px); opacity: 0.35;
+    pointer-events: none;
+  }
+
+  /* ── Navigation ── */
+  .nav {
+    position: fixed; bottom: 36px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 6px; z-index: 100;
+    align-items: center;
+    max-width: 90vw; flex-wrap: wrap; justify-content: center;
+  }
+  .nav-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,0.3); cursor: pointer;
+    transition: all 0.3s; border: none;
+  }
+  .nav-dot.active { background: #fff; transform: scale(1.5); }
+  .nav-arrow {
+    position: fixed; top: 50%; transform: translateY(-50%);
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; width: 44px; height: 44px; border-radius: 50%;
+    font-size: 18px; cursor: pointer; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s; backdrop-filter: blur(4px);
+  }
+  .nav-arrow:hover { background: rgba(255,255,255,0.25); }
+  .nav-prev { left: 20px; }
+  .nav-next { right: 20px; }
+
+  /* Progress bar */
+  .progress {
+    position: fixed; top: 0; left: 0; height: 3px;
+    background: rgba(255,255,255,0.8);
+    transition: width 0.6s ease; z-index: 200;
+  }
+
+  /* ── AUTO-PLAY indicator ── */
+  .autoplay-ring {
+    position: fixed; bottom: 30px; right: 36px;
+    width: 36px; height: 36px; z-index: 200; cursor: pointer;
+  }
+  .autoplay-ring svg { width: 36px; height: 36px; transform: rotate(-90deg); }
+  .autoplay-ring circle.track { fill: none; stroke: rgba(255,255,255,0.15); stroke-width: 2.5; }
+  .autoplay-ring circle.fill {
+    fill: none; stroke: rgba(255,255,255,0.7); stroke-width: 2.5;
+    stroke-dasharray: 100; stroke-dashoffset: 100;
+    transition: stroke-dashoffset 0.1s linear;
+  }
+  .autoplay-ring .pause-icon {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.6); font-size: 10px; font-weight: 700;
+  }
+
+  /* Slide Themes mapped by index dynamically in script or using modular IDs */
+  .theme-1 { background: linear-gradient(135deg, #1a0a00 0%, #6b2800 50%, #c45200 100%); color: #FFF3E0; }
+  .theme-2 { background: linear-gradient(160deg, #0d1b4b 0%, #1a2f7a 40%, #8b3a8b 100%); color: #E8F4FF; }
+  .theme-3 { background: linear-gradient(145deg, #1a0020 0%, #6b0057 55%, #c2006e 100%); color: #FFE4F0; }
+  .theme-4 { background: linear-gradient(135deg, #001a1a 0%, #006060 50%, #00b894 100%); color: #E0FFF8; }
+  .theme-5 { background: linear-gradient(150deg, #1a1200 0%, #4a3500 50%, #8b6800 100%); color: #FFFDE7; }
+  .theme-6 { background: linear-gradient(140deg, #001208 0%, #004d20 50%, #007a33 100%); color: #E8FFF0; }
+  .theme-7 { background: linear-gradient(135deg, #00001a 0%, #00008b 50%, #0000ff 100%); color: #E0E8FF; }
+  .theme-8 { background: linear-gradient(145deg, #001a06 0%, #004d1a 45%, #006622 100%); color: #F0FFF4; }
+  .theme-9 { background: linear-gradient(155deg, #000d1a 0%, #003366 45%, #0066cc 100%); color: #E0F4FF; }
+  .theme-10 { background: linear-gradient(135deg, #1a0500 0%, #7a2800 45%, #d4500a 100%); color: #FFF8E1; }
+
+  .line-accent {
+    width: 80px; height: 3px; border-radius: 2px;
+    margin: 20px auto; opacity: 0.6;
+  }
+
+  .can-pill {
+    position: absolute; bottom: 28px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px; letter-spacing: 3.5px;
+    text-transform: uppercase; font-weight: 700;
+    border: 1.5px solid rgba(255,255,255,0.35);
+    padding: 6px 20px; border-radius: 30px;
+    color: rgba(255,255,255,0.55); white-space: nowrap;
+  }
+
+  .stars { position: absolute; inset: 0; pointer-events: none; }
+  .star { position: absolute; background: #fff; border-radius: 50%; animation: twinkle 3s ease-in-out infinite; }
+  @keyframes twinkle { 0%,100% { opacity: 0.2; } 50% { opacity: 1; } }
+
+  .slide.active .fact-text { animation: slideUp 0.6s ease forwards; }
+  .slide.active .sub-text { animation: slideUp 0.8s ease forwards; }
+  .slide.active .emoji-big { animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards, floatEmoji 4s ease-in-out 0.5s infinite; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="progress" id="progress"></div>
+
+<button class="nav-arrow nav-prev" onclick="changeSlide(-1)">‹</button>
+<button class="nav-arrow nav-next" onclick="changeSlide(1)">›</button>
+
+<div class="autoplay-ring" id="autoplayRing" onclick="toggleAutoplay()" title="Pause/Resume">
+  <svg viewBox="0 0 36 36">
+    <circle class="track" cx="18" cy="18" r="15.9"/>
+    <circle class="fill" id="progressCircle" cx="18" cy="18" r="15.9"/>
+  </svg>
+  <div class="pause-icon" id="pauseIcon">▶</div>
+</div>
+
+<div class="slides-wrap" id="slidesWrap">
+
+  <div class="slide active theme-1">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">01 / 50</span>
+    <div class="emoji-big">📮</div>
+    <div class="fact-text">India is home to a <em>floating post office</em> anchored on a lake.</div>
+    <div class="line-accent" style="background:#ff9500;"></div>
+    <div class="sub-text">Located on Dal Lake in Srinagar, Kashmir, it sits on a massive houseboat and features its own museum. Seal marks show a boatman rowing.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-2">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">02 / 50</span>
+    <div class="emoji-big">🛤️</div>
+    <div class="fact-text">The world's <em>highest rail bridge</em> arches right over the Chenab River.</div>
+    <div class="line-accent" style="background:#4a90d9;"></div>
+    <div class="sub-text">Standing 359 meters above the river bed, the steel arch Chenab Bridge is taller than the Eiffel Tower.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-3">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">03 / 50</span>
+    <div class="emoji-big">🚪</div>
+    <div class="fact-text">An entire Indian village has <mark>no doors or locks</mark> on any of its houses.</div>
+    <div class="line-accent" style="background:#ff0080;"></div>
+    <div class="sub-text">In Shani Shingnapur, Maharashtra, locals believe Lord Shani guards the village. Even the local UCO Bank branch handles cash without traditional doors.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-4">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">04 / 50</span>
+    <div class="emoji-big">🗳️</div>
+    <div class="fact-text">A polling booth is set up in a forest for just <em>one single voter</em> every election.</div>
+    <div class="line-accent" style="background:#00cec9;"></div>
+    <div class="sub-text">Deep inside the Gir Forest, a dedicated team journeys to establish a voting booth for Mahant Haridasji, keeping to rules that a voter must never travel far to cast their ballot.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-5">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">05 / 50</span>
+    <div class="emoji-big">🛕</div>
+    <div class="fact-text">The Brihadeeswarar Temple's capstone weighs <em>80 tonnes</em> and casts no shadow at noon.</div>
+    <div class="line-accent" style="background:#f9ca24;"></div>
+    <div class="sub-text">Built from a single piece of granite in Thanjavur around 1010 AD, engineers are still puzzled over how it was lifted onto a 216-foot tower without modern cranes.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-6">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">06 / 50</span>
+    <div class="emoji-big">🌱</div>
+    <div class="fact-text">Bridges in Meghalaya are grown <em>completely out of living tree roots</em>.</div>
+    <div class="line-accent" style="background:#00b341;"></div>
+    <div class="sub-text">The Khasi people guide Ficus tree roots across rivers inside hollow bamboo. Over decades, they fortify into pathways that grow stronger with time.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-7">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">07 / 50</span>
+    <div class="emoji-big">🌌</div>
+    <div class="fact-text">A massive <em>crater lake</em> in Maharashtra was formed by a meteorite crash 52,000 years ago.</div>
+    <div class="line-accent" style="background:#00c6ff;"></div>
+    <div class="sub-text">Lonar Lake is a basalt impact structure. Its unique water chemistry supports rare microorganisms and famously turned pink overnight in 2020.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-8">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">08 / 50</span>
+    <div class="emoji-big">🎲</div>
+    <div class="fact-text">Snakes and Ladders originated in ancient India as a <mark>lesson on karma</mark>.</div>
+    <div class="line-accent" style="background:#00b341;"></div>
+    <div class="sub-text">Known originally as 'Moksha Patam,' ladders stood for virtues while snakes represented vices. Landing on the final square meant spiritual liberation.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-9">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">09 / 50</span>
+    <div class="emoji-big">🪘</div>
+    <div class="fact-text">The <em>musical pillars</em> of Hampi ring out clear notes when tapped.</div>
+    <div class="line-accent" style="background:#0099ff;"></div>
+    <div class="sub-text">Inside the Vittala Temple complex, 56 granite pillars produce distinct percussive and wind sounds, built carefully during the heights of the Vijayanagara Empire.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-10">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">10 / 50</span>
+    <div class="emoji-big">🍛</div>
+    <div class="fact-text">Mumbai's <em>Dabbawalas</em> deliver thousands of lunchboxes daily with an error rate of 1 in 6 million.</div>
+    <div class="line-accent" style="background:#ff9500;"></div>
+    <div class="sub-text">Operating for over 130 years, this complex logistics web relies purely on simple color-coded alphanumeric marks, earning a Six Sigma rating.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-1">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">11 / 50</span>
+    <div class="emoji-big">🌧️</div>
+    <div class="fact-text">The wettest inhabited place on Earth sees over <em>11,800 mm of rain</em> annually.</div>
+    <div class="line-accent" style="background:#e65100;"></div>
+    <div class="sub-text">Mawsynram in Meghalaya catches heavy monsoon moisture from the Bay of Bengal, requiring outdoor workers to wear full-body umbrellas woven from bamboo and banana leaves.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-2">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">12 / 50</span>
+    <div class="emoji-big">🦁</div>
+    <div class="fact-text">India is the only country where both <em>wild lions and tigers</em> naturally coexist.</div>
+    <div class="line-accent" style="background:#ff6d00;"></div>
+    <div class="sub-text">The subcontinent provides native habitats to both Bengal tigers and Asiatic lions, which roam the protected dry deciduous forests of Gujarat.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-3">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">13 / 50</span>
+    <div class="emoji-big">📐</div>
+    <div class="fact-text">The Jaipur Jantar Mantar features the world's <em>largest stone sundial</em>.</div>
+    <div class="line-accent" style="background:#c0c0c0;"></div>
+    <div class="sub-text">Built in 1734 by Maharaja Sawai Jai Singh II, the massive Vrihat Samrat Yantra stands 27 meters tall and measures local time down to a precision of two seconds.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-4">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">14 / 50</span>
+    <div class="emoji-big">🌊</div>
+    <div class="fact-text">A tidal phenomenon at Chandipur Beach makes the sea <em>disappear by up to 5 km</em> daily.</div>
+    <div class="line-accent" style="background:#ff00cc;"></div>
+    <div class="sub-text">Located in Odisha, the water completely recedes during low tide, leaving the muddy seafloor open for visitors to walk on before returning during high tide.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-5">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">15 / 50</span>
+    <div class="emoji-big">🏺</div>
+    <div class="fact-text">The Harappan town of Dholavira engineered a <mark>mega-network of reservoirs</mark> 4,500 years ago.</div>
+    <div class="line-accent" style="background:#c49a00;"></div>
+    <div class="sub-text">Located in the arid Rann of Kutch, this Indus Valley civilization site carved massive rainwater harvesting systems directly into solid rock to survive dry seasons.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-6">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">16 / 50</span>
+    <div class="emoji-big">🧂</div>
+    <div class="fact-text">The Rann of Kutch marshlands transform into a <em>glistening salt desert</em> for four months every year.</div>
+    <div class="line-accent" style="background:#1e90ff;"></div>
+    <div class="sub-text">As summer monsoon waters dry up, a thick, white layer of salt crystal crust covers over 7,500 square kilometers, forming a striking landscape under full moons.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-7">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">17 / 50</span>
+    <div class="emoji-big">🚂</div>
+    <div class="fact-text">The Darjeeling Toy Train has chugged along a narrow-gauge alpine track <em>since 1881</em>.</div>
+    <div class="line-accent" style="background:#e6a800;"></div>
+    <div class="sub-text">Reaching altitudes over 7,000 feet, this classic steam-powered engineering marvel uses loops and Z-reverses to scale steep mountain grades.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-8">
+    <div class="stars" id="starField"></div>
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">18 / 50</span>
+    <div class="emoji-big">🌅</div>
+    <div class="fact-text">The sun rises at <em>4:00 AM</em> in Dong, India's easternmost village.</div>
+    <div class="line-accent" style="background:#0066ff;"></div>
+    <div class="sub-text">Tucked away in Arunachal Pradesh near borders with China and Myanmar, this mountain settlement catches the nation's very first rays while western areas are deep in night.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-9">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">19 / 50</span>
+    <div class="emoji-big">🍲</div>
+    <div class="fact-text">A community kitchen serves over <em>100,000 free hot meals</em> to people every single day.</div>
+    <div class="line-accent" style="background:#9900ff;"></div>
+    <div class="sub-text">The mega mega-kitchen at Amritsar's Golden Temple runs continuously on volunteer labor, feeding anyone regardless of background. All sit side-by-side on the floor.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-10">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">20 / 50</span>
+    <div class="emoji-big">🪵</div>
+    <div class="fact-text">Sandalwood artists can carve intricate designs into wood that <em>holds scent for decades</em>.</div>
+    <div class="line-accent" style="background:#ff8c00;"></div>
+    <div class="sub-text">The core heartwood of Santalum album contains deep aromatic oils. Authentic carvings from Karnataka retain their distinct earthy fragrance across generations.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-1">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">21 / 50</span>
+    <div class="emoji-big">🚂</div>
+    <div class="fact-text">Japan uses specialized <em>bullet train track sprinklers</em> to melt winter snow pack.</div>
+    <div class="line-accent" style="background:#ff0000;"></div>
+    <div class="sub-text">In high-snow areas like Joetsu, heated water jets spray rail corridors constantly to clear ice blocks, keeping trains running on time down to the exact second.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-2">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">22 / 50</span>
+    <div class="emoji-big">🧗</div>
+    <div class="fact-text">A cliffside monastery in Bhutan clings to solid rock <em>900 meters above valleys</em>.</div>
+    <div class="line-accent" style="background:#ff5722;"></div>
+    <div class="sub-text">Paro Taktsang, or the Tiger's Nest, was built around mountain caves in 1692. It is accessible only by steep trails through pine forests.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-3">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">23 / 50</span>
+    <div class="emoji-big">🎭</div>
+    <div class="fact-text">Balinese Kecak dances tell major stories using <em>only vocal choruses</em>.</div>
+    <div class="line-accent" style="background:#00bcd4;"></div>
+    <div class="sub-text">Instead of gamelan instruments, a circle of 50+ men chants rhythmic 'chak-chak' sounds, moving their hands to act out epic battles from ancient lore.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-4">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">24 / 50</span>
+    <div class="emoji-big">🐨</div>
+    <div class="fact-text">Koalas possess unique fingerprints <em>nearly identical to human ones</em>.</div>
+    <div class="line-accent" style="background:#ff8f00;"></div>
+    <div class="sub-text">Even under scanning electron microscopes, the whorls, loops, and ridges on a koala's paw are hard to tell apart from human prints.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-5">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">25 / 50</span>
+    <div class="emoji-big">☕</div>
+    <div class="fact-text">Traditional Singapore Kopi coffee beans are roasted <em>with sugar and butter</em>.</div>
+    <div class="line-accent" style="background:#00c853;"></div>
+    <div class="sub-text">This processing style caramelizes bean surfaces during roasting, yielding a dark brew often balanced with sweet condensed milk in local kopitiams.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-6">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">26 / 50</span>
+    <div class="emoji-big">🏛️</div>
+    <div class="fact-text">The world's <em>largest Buddhist temple</em> sits deep within Central Java.</div>
+    <div class="line-accent" style="background:#7c00cc;"></div>
+    <div class="sub-text">Borobudur features 9 stacked platforms, 72 openwork stupas containing Buddha statues, and detailed relief work built from volcanic stone around the 9th century.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-7">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">27 / 50</span>
+    <div class="emoji-big">🏮</div>
+    <div class="fact-text">South Korea celebrates springtime by stringing <em>thousands of lotus lanterns</em> across cities.</div>
+    <div class="line-accent" style="background:#ff1493;"></div>
+    <div class="sub-text">The historic Yeondeunghoe festival features massive parades and handmade paper lanterns illuminating ancient temple yards across Seoul.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-8">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">28 / 50</span>
+    <div class="emoji-big">📜</div>
+    <div class="fact-text">Traditional Chinese Xuan paper can endure safely for <em>over 1,000 years</em>.</div>
+    <div class="line-accent" style="background:#ffffff;"></div>
+    <div class="sub-text">Woven from the tough bark of sandalwood trees and rice straw, this smooth parchment resists aging and insect damage, preserving historic calligraphy art intact.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-9">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">29 / 50</span>
+    <div class="emoji-big">🦎</div>
+    <div class="fact-text">The largest living lizards on Earth swim <em>across ocean island channels</em>.</div>
+    <div class="line-accent" style="background:#00bcd4;"></div>
+    <div class="sub-text">Komodo dragons grow up to 3 meters long. Native to East Nusa Tenggara, they hunt across rugged terrain and swim regularly between neighboring coastlines.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-10">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">30 / 50</span>
+    <div class="emoji-big">🧶</div>
+    <div class="fact-text">Traditional Ikat weavers tie-dye threads <em>before any cloth is woven</em>.</div>
+    <div class="line-accent" style="background:#e91e63;"></div>
+    <div class="sub-text">Practiced across India, Indonesia, and Central Asia, bundles of yarn are wrapped tightly to block dye absorption, lining up to form geometric patterns on looms.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-1">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">31 / 50</span>
+    <div class="emoji-big">🪁</div>
+    <div class="fact-text">An international festival fills skies with <em>massive, intricate kites</em> every January.</div>
+    <div class="line-accent" style="background:#ff9500;"></div>
+    <div class="sub-text">During Uttarayan in Gujarat, thousands gather on rooftops to fly colorful kites, filling the horizon with handcrafted paper designs to celebrate lengthening days.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-2">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">32 / 50</span>
+    <div class="emoji-big">🌾</div>
+    <div class="fact-text">Traditional Warli painters use simple <em>rice paste and twigs</em> on mud walls.</div>
+    <div class="line-accent" style="background:#4a90d9;"></div>
+    <div class="sub-text">This indigenous art form from Maharashtra relies entirely on geometric shapes—circles, triangles, and squares—to picture harvests, weddings, and communal dances.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-3">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">33 / 50</span>
+    <div class="emoji-big">🦁</div>
+    <div class="fact-text">Dancers balance massive <em>wooden peacock and lion structures</em> on their heads.</div>
+    <div class="line-accent" style="background:#ff0080;"></div>
+    <div class="sub-text">In Tamil Nadu folk arts like Mayilattam and Poikal Kuthirai Attam, performers wear heavy, elaborate frames and walk on stilts to mimic animal gaits.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-4">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">34 / 50</span>
+    <div class="emoji-big">🥛</div>
+    <div class="fact-text">A sweet saffron lassi in Punjab can be served in <em>one-liter clay cups</em>.</div>
+    <div class="line-accent" style="background:#00cec9;"></div>
+    <div class="sub-text">Traditional dhabas churn thick yogurt drinks using large wooden blenders, serving them topped with fresh clotted cream in porous, earthy 'kulhads.'</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-5">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">35 / 50</span>
+    <div class="emoji-big">🕌</div>
+    <div class="fact-text">A floating 15th-century mosque is accessible only <em>during low tide conditions</em>.</div>
+    <div class="line-accent" style="background:#f9ca24;"></div>
+    <div class="sub-text">The Haji Ali Dargah in Mumbai sits on a tiny islet off the coast. Its causeway gets completely submerged by sea water during high tide.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-6">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">36 / 50</span>
+    <div class="emoji-big">🌸</div>
+    <div class="fact-text">The valley of Munnar turns a brilliant purple <em>once every 12 years</em>.</div>
+    <div class="line-accent" style="background:#00b341;"></div>
+    <div class="sub-text">The rare Neelakurinji shrub blooms in massive cycles, carpeting the rolling hills of Kerala's Western Ghats in vivid shades of violet.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-7">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">37 / 50</span>
+    <div class="emoji-big">🥣</div>
+    <div class="fact-text">Master metalworkers forge <em>singing bronze bowls</em> with secretive copper ratios.</div>
+    <div class="line-accent" style="background:#00c6ff;"></div>
+    <div class="sub-text">Hand-hammered across Himalayan regions, these ritual instruments create deep, resonating overtones when rubbed with felt mallets.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-8">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">38 / 50</span>
+    <div class="emoji-big">🛶</div>
+    <div class="fact-text">Chundam Vallam snake boats stretch over <em>100 feet long</em> on Kerala backwaters.</div>
+    <div class="line-accent" style="background:#00b341;"></div>
+    <div class="sub-text">Carved from wild jackfruit trees, these race boats hold up to 100 oarsmen who paddle in perfect rhythm to traditional boat songs.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-9">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">39 / 50</span>
+    <div class="emoji-big">🎭</div>
+    <div class="fact-text">Kathakali actors train for years to control their <em>individual eye movements</em>.</div>
+    <div class="line-accent" style="background:#0099ff;"></div>
+    <div class="sub-text">This classical dance-drama uses specific facial muscle exercises and natural seed pigments to redden eyes, portraying deep emotion without spoken words.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-10">
+    <span class="slide-tag">India Trivia</span>
+    <span class="slide-number">40 / 50</span>
+    <div class="emoji-big">🐚</div>
+    <div class="fact-text">Chank shells harvested in Bengal are carved into <em>sacred bridal bangles</em>.</div>
+    <div class="line-accent" style="background:#ff9500;"></div>
+    <div class="sub-text">Known as 'Shakha,' artisans use unique specialized saws to slice ocean conch shells into white rings, which are polished and detailed for traditional weddings.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-1">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">41 / 50</span>
+    <div class="emoji-big">🪵</div>
+    <div class="fact-text">Traditional Maori meeting houses feature carvings that <em>recount entire tribal lineages</em>.</div>
+    <div class="line-accent" style="background:#e65100;"></div>
+    <div class="sub-text">Every pillar and beam inside a Wharenui structure represents a specific ancestor, using intricate patterns carved from native totara timbers.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-2">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">42 / 50</span>
+    <div class="emoji-big">🔔</div>
+    <div class="fact-text">A ancient Korean bell rings with a <em>distinctive low heartbeat hum</em>.</div>
+    <div class="line-accent" style="background:#ff6d00;"></div>
+    <div class="sub-text">The Divine Bell of King Seongdeok features a hollow acoustic tube structure underneath that filters sound waves to create long, deep vibrations.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-3">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">43 / 50</span>
+    <div class="emoji-big">🎭</div>
+    <div class="fact-text">Traditional Wayang Kulit puppets are punched from <em>cured water buffalo hide</em>.</div>
+    <div class="line-accent" style="background:#c0c0c0;"></div>
+    <div class="sub-text">Artisans carve thousands of tiny holes into shadows templates, casting intricate silhouettes onto cotton screens during nocturnal folklore plays in Java.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-4">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">44 / 50</span>
+    <div class="emoji-big">🥬</div>
+    <div class="fact-text">Traditional Kimchi preparation centers on a <em>communal winter preservation ritual</em>.</div>
+    <div class="line-accent" style="background:#ff00cc;"></div>
+    <div class="sub-text">Known as 'Kimjang,' whole neighborhoods gather in late autumn to spice and ferment massive batches of cabbage, sharing food security for cold months.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-5">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">45 / 50</span>
+    <div class="emoji-big">🎋</div>
+    <div class="fact-text">The Arashiyama bamboo stalks can grow up to <em>one meter taller in a single day</em>.</div>
+    <div class="line-accent" style="background:#c49a00;"></div>
+    <div class="sub-text">This famous forest corridor in Kyoto features unique soil conditions that support rapid growth cycles, creating deep rustling soundscapes when wind passes.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-6">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">46 / 50</span>
+    <div class="emoji-big">🛕</div>
+    <div class="fact-text">The stone faces of Bayon Temple carry <em>mysterious, serene smiles</em>.</div>
+    <div class="line-accent" style="background:#1e90ff;"></div>
+    <div class="sub-text">Located in Cambodia, over 200 massive stone faces are carved directly into 54 towers, capturing calm gazes looking out across the jungle canopy.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-7">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">47 / 50</span>
+    <div class="emoji-big">🏢</div>
+    <div class="fact-text">Hong Kong skyscrapers leave <em>hollow openings in their structures</em> for dragon paths.</div>
+    <div class="line-accent" style="background:#e6a800;"></div>
+    <div class="sub-text">Known as 'Dragon Gates,' these architectural design choices provide unblocked paths for mythical dragons to fly from mountains down to the harbor water.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-8">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">48 / 50</span>
+    <div class="emoji-big">☕</div>
+    <div class="fact-text">Melbourne hosts a massive concentration of <em>boutique, small-batch coffee roasters</em>.</div>
+    <div class="line-accent" style="background:#0066ff;"></div>
+    <div class="sub-text">Brought over by Italian and Greek migration waves, the city's alleyways host a highly specialized espresso culture focused on fair-trade sourcing.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-9">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">49 / 50</span>
+    <div class="emoji-big">🪁</div>
+    <div class="fact-text">Traditional Malaysian Wau kites use <em>bamboo frames that hum in flight</em>.</div>
+    <div class="line-accent" style="background:#9900ff;"></div>
+    <div class="sub-text">Artisans fix curved bamboo hummers across kite tops. When flown high above coastal fields, the wind creates steady, whistling musical notes.</div>
+    <div class="can-pill">APAC Cultural Awareness Network · Belonging Week</div>
+  </div>
+
+  <div class="slide theme-10">
+    <span class="slide-tag">APAC Trivia</span>
+    <span class="slide-number">50 / 50</span>
+    <div class="emoji-big">🍵</div>
+    <div class="fact-text">Ceremonial Matcha whisking relies entirely on <em>single-piece bamboo splits</em>.</div>
+    <div class="line-accent" style="background:#ff8c00;"></div>
+    <div class="sub-text">A traditional 'Chasen' is carved out of a single stalk of seasoned bamboo, split down into up to 120 fine prongs to create smooth, frothy tea bowls.</div>
+    <div class="can-pill">✦ APAC Cultural Awareness Network · Belonging Week 2026 · Join us! ✦</div>
+  </div>
+
+</div><nav class="nav" id="dotsNav"></nav>
+
+<script>
+  // ── State ──
+  let current = 0;
+  const total = 50; // Updated to match the new slide count
+  let autoplay = true;
+  let autoInterval = null;
+  const DURATION = 8000; // ms per slide
+  let startTime = null;
+  let rafId = null;
+  let paused = false;
+
+  // ── Build dots ──
+  const dotsNav = document.getElementById('dotsNav');
+  for (let i = 0; i < total; i++) {
+    const d = document.createElement('button');
+    d.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    d.onclick = () => goTo(i);
+    dotsNav.appendChild(d);
+  }
+
+  // ── Star field for slide 18 ──
+  const starField = document.getElementById('starField');
+  if (starField) {
+    for (let i = 0; i < 80; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      const size = Math.random() * 3 + 1;
+      s.style.cssText = `
+        width:${size}px; height:${size}px;
+        top:${Math.random()*100}%; left:${Math.random()*100}%;
+        animation-delay:${Math.random()*3}s;
+        animation-duration:${2+Math.random()*3}s;
+      `;
+      starField.appendChild(s);
+    }
+  }
+
+  // ── Go to slide ──
+  function goTo(idx) {
+    const slides = document.querySelectorAll('.slide');
+    const dots = document.querySelectorAll('.nav-dot');
+    if(!slides[current] || !dots[current]) return;
+    
+    slides[current].classList.remove('active');
+    dots[current].classList.remove('active');
+    current = (idx + total) % total;
+    slides[current].classList.add('active');
+    dots[current].classList.add('active');
+    document.getElementById('progress').style.width = ((current + 1) / total * 100) + '%';
+    // reset ring
+    startTime = performance.now();
+  }
+
+  function changeSlide(dir) {
+    goTo(current + dir);
+  }
+
+  // ── Autoplay with ring ──
+  const circle = document.getElementById('progressCircle');
+  const circumference = 2 * Math.PI * 15.9; // ~99.9
+  circle.style.strokeDasharray = circumference;
+  circle.style.strokeDashoffset = circumference;
+
+  function tickRing(ts) {
+    if (!startTime) startTime = ts;
+    const elapsed = ts - startTime;
+    const fraction = Math.min(elapsed / DURATION, 1);
+    circle.style.strokeDashoffset = circumference * (1 - fraction);
+    if (fraction >= 1) {
+      goTo(current + 1);
+    }
+    rafId = requestAnimationFrame(tickRing);
+  }
+
+  function startRing() {
+    startTime = performance.now();
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(tickRing);
+  }
+
+  function stopRing() {
+    if (rafId) cancelAnimationFrame(rafId);
+    circle.style.strokeDashoffset = circumference;
+  }
+
+  function toggleAutoplay() {
+    paused = !paused;
+    document.getElementById('pauseIcon').textContent = paused ? '▶' : '⏸';
+    if (paused) stopRing();
+    else startRing();
+  }
+
+  // Start
+  document.getElementById('pauseIcon').textContent = '⏸';
+  startRing();
+
+  // ── Keyboard ──
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { goTo(current+1); startRing(); }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { goTo(current-1); startRing(); }
+    if (e.key === ' ') toggleAutoplay();
+  });
+
+  // ── Swipe ──
+  let touchX = 0;
+  document.addEventListener('touchstart', e => touchX = e.touches[0].clientX);
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 50) { goTo(current + (dx < 0 ? 1 : -1)); startRing(); }
+  });
+
+  // ── Custom cursor ──
+  const cur = document.getElementById('cursor');
+  document.addEventListener('mousemove', e => {
+    cur.style.left = e.clientX + 'px';
+    cur.style.top  = e.clientY + 'px';
+  });
+</script>
+</body>
+</html>
